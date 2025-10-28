@@ -1,23 +1,7 @@
 use anyhow::{bail, Context};
+use gossip_glomers::*;
 use serde::{Deserialize, Serialize};
 use std::io::{StdoutLock, Write};
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct Message {
-    src: String,
-    #[serde(rename = "dest")]
-    dst: String,
-    body: Body,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct Body {
-    #[serde(rename = "msg_id")]
-    id: Option<usize>,
-    in_reply_to: Option<usize>,
-    #[serde(flatten)]
-    payload: Payload,
-}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -40,8 +24,8 @@ struct EchoNode {
     id: usize,
 }
 
-impl EchoNode {
-    pub fn step(&mut self, input: Message, output: &mut StdoutLock) -> anyhow::Result<()> {
+impl Node<Payload> for EchoNode {
+    fn step(&mut self, input: Message<Payload>, output: &mut StdoutLock) -> anyhow::Result<()> {
         match input.body.payload {
             Payload::Echo { echo } => {
                 let reply = Message {
@@ -88,20 +72,5 @@ impl EchoNode {
 }
 
 fn main() -> anyhow::Result<()> {
-    let stdin = std::io::stdin().lock();
-    let inputs = serde_json::Deserializer::from_reader(stdin).into_iter::<Message>();
-
-    let mut stdout = std::io::stdout().lock();
-
-    let mut state = EchoNode { id: 0 };
-
-    for input in inputs {
-        let input = input.context("Mealstream input from STDIN could not be deserialized")?;
-        state
-            .step(input, &mut stdout)
-            .context("Node step function failed")
-            .unwrap()
-    }
-
-    Ok(())
+    main_loop(EchoNode { id: 0 })
 }
