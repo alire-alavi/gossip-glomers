@@ -15,7 +15,7 @@ pub struct Message<Payload> {
 
 impl<Payload> Message<Payload> {
     pub fn into_reply(self, id: Option<&mut usize>) -> Self {
-        Self {
+        return Self {
             src: self.dst,
             dst: self.src,
             body: Body {
