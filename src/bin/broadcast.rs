@@ -42,21 +42,31 @@ impl Node<(), Payload> for BroadcastNode {
         })
     }
     fn step(&mut self, input: Message<Payload>, output: &mut StdoutLock) -> anyhow::Result<()> {
-        let reply = input.into_reply(self.id);
+        let mut reply = input.into_reply(Some(&mut self.id));
         match reply.body.payload {
             Payload::Broadcast { message } => {
+                self.messages.push(message);
                 reply.body.payload = Payload::BroadcastOk;
                 serde_json::to_writer(&mut *output, &reply)
                     .context("serialize response to broadcast")?;
                 output.write_all(b"\n").context("write trailing newline")?;
-                // reply
-                //     .serialize(output)
-                //     .context("serialize response to echo")?;
-                self.id += 1;
             }
-            Payload::Read => {}
-            Payload::Topology { .. } => {}
-            Payload::ReadOk { messages } | Payload::BroadcastOk | Payload::TopologyOk => {}
+            Payload::Read => {
+                reply.body.payload = Payload::ReadOk {
+                    messages: self.messages.clone(),
+                };
+                serde_json::to_writer(&mut *output, &reply)
+                    .context("Serialize response to broadcast")?;
+                output.write_all(b"\n").context("write trailing newline")?;
+            }
+            Payload::Topology { topology: _ } => {
+                reply.body.payload = Payload::TopologyOk;
+                serde_json::to_writer(&mut *output, &reply)
+                    .context("Serialize response to broadcast")?;
+                output.write_all(b"\n").context("write trailing newline")?;
+            }
+            Payload::ReadOk { .. } => {}
+            Payload::BroadcastOk | Payload::TopologyOk => {}
         }
         Ok(())
     }
